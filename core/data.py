@@ -17,10 +17,20 @@ class Message:
     |      Additional     | RRs holding additional information
     +---------------------+
 
+    Attributes:
+        Header: Header field in DNS message.
+        Questions: List of questions contains Question section in DNS message.
+        Answers: List of questions contains Answer section in DNS message.
+        Authorities: List of questions contains Authority section in DNS message.
+        Additionals: List of questions contains Additional section in DNS message.
     """
 
     def __init__(self, message: bytes):
-        """Construct DNS Message from message bytes."""
+        """Construct DNS Message from message bytes.
+
+        Args:
+            message: Whole DNS message.
+        """
         self.Header = Header(message[0:12])
         questions_count = int(self.Header.QDCOUNT.hex(), 16)
         answers_count = int(self.Header.ANCOUNT.hex(), 16)
@@ -32,48 +42,53 @@ class Message:
         self.Additionals = [None] * additionals_count
         next_start = 12
         if questions_count != 0:
-            next_start = self._parse_question(message[next_start:])
+            next_start = self._parse_question(message, next_start)
         if answers_count != 0:
             next_start = self._parse_rr(
-                message[next_start:], self.Answers, answers_count)
+                message, next_start, self.Answers, answers_count)
         if authorities_count != 0:
             next_start = self._parse_rr(
-                message[next_start:], self.Authorities, authorities_count)
+                message, next_start, self.Authorities, authorities_count)
         if additionals_count != 0:
             next_start = self._parse_rr(
-                message[next_start:], self.Additionals, additionals_count)
+                message, next_start, self.Additionals, additionals_count)
 
-    def _parse_question(self, message: bytes) -> int:
+    def _parse_question(self, message: bytes, start: int) -> int:
         """Parse Questions in Message.
 
-        Given the bytes after Header to parse the questions and
-        return the byte index after the end of Question section.
+        Args:
+            message: Whole DNS message.
+            start: Start byte index of Questions Section in message.
 
-        Raise AssertionError when the length of message <= 0.
-
+        Returns:
+            Start byte index of next section.
         """
-        assert len(message) > 0
-        index = 0
+        index = start
         for i in range(int(self.Header.QDCOUNT.hex(), 16)):
-            next_start = message.find(0) + 5
+            next_start = index + message[index:].find(0) + 5
             self.Questions[i] = Question(message[index:next_start])
             index = next_start
         return index
 
-    def _parse_rr(self, message: bytes, dest: list, count: int) -> int:
+    def _parse_rr(self, message: bytes, start: int, dest: list, count: int) -> int:
         """Parse Resource Record(RR) in Message.
 
-        Given the bytes after Header and Question section and RRs 
-        to parse the RRs and return the byte index after the end 
-        of RRs.
+        Args:
+            message: Whole DNS message.
+            start: Start byte index of RRs(Answer, Authority or Additional)
+                Section in message.
+            dest: Destination list to store the parsed RR.
+            count: Number of RRs to parse.
 
-        Raise AssertionError when the length of message <= 0.
-
+        Returns:
+            Start byte index of next section.
         """
-        assert len(message) > 0
-        index = 0
+        index = start
         for i in range(count):
-            TYPE_start = message.find(0) + 1
+            if message[index] >> 6 & 0b0011 == 0b0011:
+                TYPE_start = index + 2
+            else:
+                TYPE_start = index + message[index:].find(0) + 1
             RDLENGTH = int(message[TYPE_start + 8:TYPE_start + 10].hex(), 16)
             next_start = TYPE_start + RDLENGTH + 10
             dest[i] = ResourceRecord(message[index:next_start], RDLENGTH)
