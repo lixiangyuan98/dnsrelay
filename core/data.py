@@ -92,7 +92,6 @@ class Header:
 
     def get_bytes(self) -> bytes:
         """Get `bytes` of `Header` in DNS message."""
-
         return self.ID + (self.QR[0] << 7 & 0x80 | self.Opcode[0] << 3 & 0x78 |
                           self.AA[0] << 2 & 0x04 | self.TC[0] << 1 & 0x02 | self.RD[0]) \
             .to_bytes(1, 'big') + \
@@ -189,13 +188,13 @@ class ResourceRecord:
         RDATA(bytes): RR data.
     """
 
-    def __init__(self, NAME: bytes, TYPE: int, CLASS: int,
+    def __init__(self, NAME: bytes, TYPE: bytes, CLASS: bytes,
                  TTL: int, RDLENGTH: int, RDATA: bytes):
         """Construct `ResourceRecord` (RR) from bytes."""
 
         self.NAME = NAME
-        self.TYPE = TYPE.to_bytes(2, 'big')
-        self.CLASS = CLASS.to_bytes(2, 'big')
+        self.TYPE = TYPE
+        self.CLASS = CLASS
         self.TTL = TTL.to_bytes(4, 'big')
         self.RDLENGTH = RDLENGTH.to_bytes(2, 'big')
         self.RDATA = RDATA
@@ -205,8 +204,8 @@ class ResourceRecord:
         """Construct `bytes` from bytes."""
 
         NAME = data[:-(RDLENGTH + 10)]
-        TYPE = int(data[-(RDLENGTH + 10):-(RDLENGTH + 8)].hex(), 16)
-        CLASS = int(data[-(RDLENGTH + 8): -(RDLENGTH + 6)].hex(), 16)
+        TYPE = data[-(RDLENGTH + 10):-(RDLENGTH + 8)]
+        CLASS = data[-(RDLENGTH + 8): -(RDLENGTH + 6)]
         TTL = int(data[-(RDLENGTH + 6):-(RDLENGTH + 2)].hex(), 16)
         RDATA = data[-RDLENGTH:]
 

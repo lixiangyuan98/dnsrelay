@@ -4,5 +4,7 @@ from core.server import DNSServer
 
 
 if __name__ == '__main__':
-    server = DNSServer(parsed_args.host, parsed_args.port, parsed_args.cache)
+    server = DNSServer(parsed_args.host, parsed_args.port, 
+                parsed_args.remote_host, parsed_args.cache,
+                parsed_args.host_file)
     server.start()

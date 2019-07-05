@@ -1,5 +1,5 @@
 """CLASS field values in RR."""
-IN = 1  # the Internet
-CS = 2  # the CSNET class (Obsolete - used only for examples in some obsolete RFCs)
-CH = 3  # the CHAOS class
-HS = 4  # Hesiod [Dyer 87]
+IN = b'\x00\x01'  # the Internet
+CS = b'\x00\x02'  # the CSNET class (Obsolete - used only for examples in some obsolete RFCs)
+CH = b'\x00\x03'  # the CHAOS class
+HS = b'\x00\x04'  # Hesiod [Dyer 87]
