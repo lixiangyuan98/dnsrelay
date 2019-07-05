@@ -11,7 +11,7 @@ def get_bytes_from_ipv4(ip: str) -> bytes:
 
 def get_ipv4_from_bytes(ip: bytes) -> str:
     """Get ip address from given 4 bytes."""
-    ip = []
+    addr = []
     for i in range(4):
-        ip.append(int(ip[i].hex(), 16))
-    return '.'.join(ip)
+        addr.append(str(ip[i]))
+    return '.'.join(addr)

@@ -148,7 +148,8 @@ class DNSServer:
                 self._cache.set_ttl(message.Questions[0].get_QNAME(), 
                   int(answer.TTL.hex(), 16))
                 logger.info('Cache the record {answer}, TTL={ttl}'
-                  .format(answer=answer.RDATA, ttl=int(answer.TTL.hex(), 16)))
+                  .format(answer=ip.get_ipv4_from_bytes(answer.RDATA), 
+                  ttl=int(answer.TTL.hex(), 16)))
         return response
 
     def start(self):
