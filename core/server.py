@@ -1,10 +1,12 @@
 """DNSServer and handler method."""
-from util.log import logger
-from core.data import Message
 import threading
 import asyncio
 import socket
 
+from util.log import logger
+from .data import Message
+from . import cache
+from . import settings
 
 class DNSServer:
     """DNS Server that accepts the requests, handle them and response.
@@ -24,12 +26,24 @@ class DNSServer:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(self, host: str, port: int, cache_engine: str) -> None:
         self.event_loop = asyncio.new_event_loop()
         self.host = host
         self.port = port
-        self._socket = socket.socket(type=socket.SOCK_DGRAM)
-        self._socket.bind((self.host, self.port))
+        try:
+            self._cache = getattr(cache, settings.cache_engines[cache_engine])
+            self._socket = socket.socket(type=socket.SOCK_DGRAM)
+            self._socket.bind((self.host, self.port))
+        except KeyError:
+            logger.error('Invalid cache engine: no such engine in settings')
+        except AttributeError:
+            logger.error('Invalid cache engine: not implemented engine')
+        except PermissionError:
+            logger.error('Permission denied, try sudo')
+        else:
+            return
+        logger.info('Exit with errors')
+        exit(0)
 
     def _start_event_loop(self):
         asyncio.set_event_loop(self.event_loop)
@@ -57,16 +71,20 @@ class DNSServer:
             exit(0)
         self._socket.close()
 
-    def _handle(self, data: bytes, addr: tuple) -> None:
+    def _handle(self, data: bytes, source_addr: tuple) -> None:
         """Handle the received data.
 
         Parse received data to DNS message, loop up the requested domain name
         in local database or foreign DNS server and send the result back to
         the user.
-        """
 
+        Args:
+
+            data: Received data.
+            source_addr: Source host addr.
+        """
         # TODO
-        self._socket.sendto(data, addr)
+        self._socket.sendto(data, source_addr)
 
     def start(self):
         """Start the DNS Server.

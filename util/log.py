@@ -2,6 +2,7 @@
 import logging
 from .opt import parsed_args
 
+
 _log_level = {
     'DEBUG': logging.DEBUG,
     'INFO': logging.INFO,
