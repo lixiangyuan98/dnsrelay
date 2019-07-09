@@ -1,6 +1,5 @@
 """DNSServer and handler method."""
 import threading
-import asyncio
 import socket
 
 from util.log import logger
@@ -32,7 +31,6 @@ class DNSServer:
 
     def __init__(self, host: str, port: int, remote_host: str, 
                  cache_engine: str, host_filename: str) -> None:
-        self.event_loop = asyncio.new_event_loop()
         self.host = host
         self.port = port
         self._remote_host = remote_host
@@ -52,10 +50,6 @@ class DNSServer:
         logger.info('Exit with errors')
         exit(0)
 
-    def _start_event_loop(self):
-        asyncio.set_event_loop(self.event_loop)
-        self.event_loop.run_forever()
-
     def _listen(self):
         """Listen the given host and post.
 
@@ -70,9 +64,9 @@ class DNSServer:
                 data, addr = self._socket.recvfrom(1024)
                 logger.info('{addr}Receive from client: {data}'.format(
                     addr=addr, data=data))
-                self._handle(data, addr)
-                # asyncio.run_coroutine_threadsafe(
-                #     self._handle(data, addr), self.event_loop)
+                child_thread = threading.Thread(target=self._handle, args=(data, addr))
+                child_thread.setDaemon(True)
+                child_thread.start()
         except KeyboardInterrupt:
             logger.info('Stop server')
             exit(0)
@@ -94,7 +88,7 @@ class DNSServer:
         message = Message.from_bytes(data)
         question = message.Questions[0]
         if question is None:
-            logger.info('{addr}Format error'.format(addr=source_addr))
+            logger.error('{addr}Format error'.format(addr=source_addr))
             return
         if question.QTYPE == RR_type.A:
             rdata = self._cache.get(question.get_QNAME(), 'A')
@@ -104,16 +98,16 @@ class DNSServer:
                         name=question.get_QNAME(), addr=source_addr))
                     header = message.Header
                     header.RA = b'\x01'
-                    header.QDCOUNT = b'\x00\x00'
+                    header.QDCOUNT = b'\x00\x01'
                     header.ANCOUNT = b'\x00\x01'
                     header.QR = b'\x01'
                     ttl = self._cache.get_ttl(question.get_QNAME()) \
                             if self._cache.get_ttl(question.get_QNAME()) != -1 else 0
                     answer = ResourceRecord(b'\xc0\x0c', RR_type.A, RR_class.IN, ttl, 4, 
                             self._cache.get(question.get_QNAME(), 'A'))
-                    response = Message(header, [], [answer], [], []).get_bytes()
+                    response = Message(header, [question], [answer], [], []).get_bytes()
                 else:
-                    logger.info('{addr}Blocked {name}'.format(
+                    logger.warning('{addr}Blocked {name}'.format(
                         name=question.get_QNAME(), addr=source_addr))
                     header = message.Header
                     header.RA = b'\x01'
@@ -123,11 +117,11 @@ class DNSServer:
                     header.RCODE = b'\x03'
                     response = Message(header, [], [], [], []).get_bytes()
             else:
-                logger.info('{addr}Forward to remote DNS server: {name}'.format(
+                logger.debug('{addr}Forward to remote DNS server: {name}'.format(
                     name=question.get_QNAME(), addr=source_addr))
                 response = self._forward(data)
         else:
-            logger.info('{addr}Forward to remote DNS server: {name}'.format(
+            logger.debug('{addr}Forward to remote DNS server: {name}'.format(
                 name=question.get_QNAME(), addr=source_addr))
             response = self._forward(data)
         self._socket.sendto(response, source_addr)
@@ -147,7 +141,7 @@ class DNSServer:
                   'A', answer.RDATA)
                 self._cache.set_ttl(message.Questions[0].get_QNAME(), 
                   int(answer.TTL.hex(), 16))
-                logger.info('Cache the record {answer}, TTL={ttl}'
+                logger.debug('Cache the record {answer}, TTL={ttl}'
                   .format(answer=ip.get_ipv4_from_bytes(answer.RDATA), 
                   ttl=int(answer.TTL.hex(), 16)))
         return response
@@ -160,11 +154,6 @@ class DNSServer:
         """
 
         logger.info('Starting server...')
-        event_thread=threading.Thread(target=self._start_event_loop, args=())
-        event_thread.setName('EventThread')
-        event_thread.setDaemon(True)
-        event_thread.start()
-        logger.info('Event loop thread started')
         logger.info('Load host file {filename}'.format(filename=self._host_filename))
         for line in open(self._host_filename):
             addr, domain = line.split(' ')
